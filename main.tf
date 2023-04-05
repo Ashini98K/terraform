@@ -18,6 +18,7 @@
 
 # This is a terraform block 
 # It defines the definotion of the project and requiremnts needed
+# Everthing in the terraform block cannot pull anything within the infrastrucutre
 terraform {
   # Sub block which defines the provider we are using
   # Tells terraform the dependencies that we a pulling in to the project
@@ -30,11 +31,14 @@ terraform {
 
   # Setting up a backend for terraform state
   # What used is s3 but there are more options like consul, etcd, gcs, etc
-  # backend "s3" {
-  #   bucket = "value"
-  #   key    = "value"
-  #   region = "value"
-  # }
+  backend "s3" {
+    encrypt = true
+    bucket  = "terraform-backend-15039819-a"
+    key     = "terraform-state/terraform.tfstate"
+    region  = "us-east-1"
+
+    dynamodb_table = "terraform-state-lock-class"
+  }
 }
 
 # Configure the AWS Provider
@@ -45,7 +49,9 @@ provider "aws" {
   secret_key = var.AWS_SECRET_ACCESS_KEY
 }
 
+# S3 Bucket
 resource "aws_s3_bucket" "terraform_backend" {
+  count  = terraform.workspace == "backend" ? 1 : 0
   bucket = "terraform-backend-15039819-a"
   lifecycle {
     prevent_destroy = false
@@ -58,7 +64,9 @@ resource "aws_s3_bucket" "terraform_backend" {
 }
 
 resource "aws_s3_bucket_versioning" "example" {
-  bucket = "aws_s3_bucket.terraform-backend-15039819-a.id"
+  count  = terraform.workspace == "backend" ? 1 : 0
+  bucket = aws_s3_bucket.terraform_backend[0].id
+
 
   versioning_configuration {
     status = "Enabled"
@@ -66,7 +74,8 @@ resource "aws_s3_bucket_versioning" "example" {
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
-  bucket = "aws_s3_bucket.terraform-backend-15039819-a.id"
+  count  = terraform.workspace == "backend" ? 1 : 0
+  bucket = aws_s3_bucket.terraform_backend[0].id
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm = "AES256"
@@ -75,8 +84,11 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
 
 }
 
+# DynamoDB Table
 resource "aws_dynamodb_table" "terraform_state_lock" {
-  name = "terraform-state-lock-class"
+  count = terraform.workspace == "backend" ? 1 : 0
+  name  = "terraform-state-lock-class"
+
   # Id for the table
   hash_key       = "lockID"
   read_capacity  = 20
