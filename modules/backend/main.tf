@@ -1,20 +1,4 @@
-# Example code 01
-
-# Evething inside curly braces are called blocks (have a name and identifiers)
-# This is a resource block
-# Identifier : aws_instance (indicates that we are going to create an aws instance) which comes from AWS provider
-# Second identifier : test_instance (then name we use witihin our teffaform code)
-# resource "aws_instance" "test_instance" {
-#   # Arguments
-#   ami = "ami-0f7098256151"
-#   instance_type = "t2.nano"
-
-#   tags = {
-#     Name = "test server"
-#   }
-# }
-
-# Example code 02
+# Example code 03
 
 # This is a terraform block 
 # It defines the definotion of the project and requiremnts needed
@@ -49,24 +33,8 @@ provider "aws" {
   secret_key = var.AWS_SECRET_ACCESS_KEY
 }
 
-# Module for backend
-module "backend" {
-  # If the workspace is backend then run the module
-  count  = terraform.workspace == "backend" ? 1 : 0
-  source = "./modules/backend"
-}
-
-# Module for ec2
-module "ec2" {
-  # If the workspace is not backend then run the module
-  count  = terraform.workspace != "backend" ? 0 : 1
-  source = "./modules/ec2"
-  env    = terraform.workspace
-}
-
 # S3 Bucket
 resource "aws_s3_bucket" "terraform_backend" {
-  count  = terraform.workspace == "backend" ? 1 : 0
   bucket = "terraform-backend-15039819-a"
   lifecycle {
     prevent_destroy = false
@@ -79,8 +47,7 @@ resource "aws_s3_bucket" "terraform_backend" {
 }
 
 resource "aws_s3_bucket_versioning" "example" {
-  count  = terraform.workspace == "backend" ? 1 : 0
-  bucket = aws_s3_bucket.terraform_backend[0].id
+  bucket = aws_s3_bucket.terraform_backend.id
 
 
   versioning_configuration {
@@ -89,8 +56,7 @@ resource "aws_s3_bucket_versioning" "example" {
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
-  count  = terraform.workspace == "backend" ? 1 : 0
-  bucket = aws_s3_bucket.terraform_backend[0].id
+  bucket = aws_s3_bucket.terraform_backend.id
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm = "AES256"
@@ -101,8 +67,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
 
 # DynamoDB Table
 resource "aws_dynamodb_table" "terraform_state_lock" {
-  count = terraform.workspace == "backend" ? 1 : 0
-  name  = "terraform-state-lock-class"
+  name = "terraform-state-lock-class"
 
   # Id for the table
   hash_key       = "lockID"
@@ -122,9 +87,6 @@ resource "aws_dynamodb_table" "terraform_state_lock" {
 # EC2 Instance
 resource "aws_instance" "test_instance" {
   # Arguments
-  # count         = 4 #(this will create 4 instances)
-  # Here is the logic to create 0 instances if the workspace is backend workspace else for other it will create 1 instance
-  count         = terraform.workspace == "backend" ? 0 : 1
   ami           = "ami-0e9878fc797487093"
   instance_type = "t2.nano"
 
